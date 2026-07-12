@@ -151,6 +151,25 @@
   .loading{position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:100; color:var(--burgundy);}
   .spinner{width:34px; height:34px; border:3px solid #e2d9c8; border-top-color:var(--burgundy); border-radius:50%; animation:spin .8s linear infinite; margin-bottom:14px;}
   @keyframes spin{to{transform:rotate(360deg);}}
+
+  .landing{
+    position:fixed; inset:0; background:var(--bg); z-index:40;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:22px; padding:24px;
+  }
+  .landing h2{color:var(--burgundy); font-size:15px; text-transform:uppercase; letter-spacing:1px; margin:0 0 4px;}
+  .landing-btn{
+    width:100%; max-width:340px; padding:34px 20px; border-radius:20px; border:none;
+    font-size:19px; font-weight:800; letter-spacing:.5px; text-transform:uppercase;
+    box-shadow:0 4px 14px rgba(0,0,0,.15); cursor:pointer;
+  }
+  .landing-btn.genero{background:var(--burgundy); color:var(--cream);}
+  .landing-btn.jamon{background:var(--gold); color:var(--burgundy);}
+  .landing-btn .sub{display:block; font-size:11.5px; font-weight:500; text-transform:none; opacity:.85; margin-top:6px; letter-spacing:normal;}
+  .back-btn{
+    position:fixed; top:14px; left:14px; z-index:25; background:rgba(0,0,0,.25); color:#fff;
+    border:none; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600; cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -160,6 +179,21 @@
   <div id="loadingText">Conectando…</div>
 </div>
 
+<div class="landing" id="landing" style="display:none;">
+  <h2>La Despensa de Guijuelo</h2>
+  <button class="landing-btn genero" data-action="pick-cat" data-cat="genero">
+    Género Cámara
+    <span class="sub">Loncheado, embutido y producto de tienda</span>
+  </button>
+  <button class="landing-btn jamon" data-action="pick-cat" data-cat="jamon">
+    Jamones
+    <span class="sub">Piezas enteras en curación y venta</span>
+  </button>
+</div>
+
+<button class="back-btn" id="backBtn" data-action="back-landing" style="display:none;">← Cambiar sección</button>
+
+<div id="appUI" style="display:none;">
 <header>
   <div class="sync-dot" id="syncDot" title="Estado de sincronización"></div>
   <h1 id="headerTitle">Cámara Tienda</h1>
@@ -193,6 +227,7 @@
 <button class="add-fab" id="fabAlmacen" data-action="add-almacen" style="display:none;">+</button>
 
 <footer>Tienda · Solicitudes · Almacén · Proveedor</footer>
+</div>
 
 <!-- Modal añadir/editar -->
 <div class="modal-bg" id="modalBg">
@@ -205,7 +240,15 @@
     <label>Aviso cuando baje de (mínimo)</label>
     <input id="mMinimo" type="number" inputmode="numeric" value="3">
     <label id="lblProveedor">Proveedor (para agrupar pedidos)</label>
-    <input id="mProveedor" placeholder="Ej. Pinante">
+    <input id="mProveedor" list="listaProveedores" placeholder="Elige o escribe uno nuevo">
+    <datalist id="listaProveedores">
+      <option value="CARNICER">
+      <option value="PINANTE">
+      <option value="BRISA">
+      <option value="REVISAN">
+      <option value="ILANJA">
+      <option value="IGLESIAS RODRIGUEZ">
+    </datalist>
     <div class="modal-actions">
       <button class="btn btn-ghost" data-action="close-modal">Cancelar</button>
       <button class="btn btn-primary" id="btnSave" data-action="save-product">Guardar</button>
@@ -252,13 +295,24 @@ let addZone = 'tienda';
 const debounceTimers = {};
 
 const screens = ['tienda','solicitudes','almacen','proveedor'];
-const titles = {
-  tienda:      {t:'Cámara Tienda',   s:'Producto listo para vender'},
-  solicitudes: {t:'Solicitudes',     s:'Falta en tienda · pedir al almacén'},
-  almacen:     {t:'Cámara Almacén',  s:'Stock de reserva'},
-  proveedor:   {t:'Avisos proveedor',s:'Stock bajo · llamar al proveedor'}
-};
+function getTitles(){
+  if(categoria==='jamon'){
+    return {
+      tienda:      {t:'Jamones · Tienda',   s:'Piezas listas para vender'},
+      solicitudes: {t:'Solicitudes',        s:'Falta en tienda · pedir al almacén'},
+      almacen:     {t:'Jamones · Almacén',  s:'Piezas en curación/reserva'},
+      proveedor:   {t:'Avisos proveedor',   s:'Stock bajo · llamar al proveedor'}
+    };
+  }
+  return {
+    tienda:      {t:'Cámara Tienda',   s:'Producto listo para vender'},
+    solicitudes: {t:'Solicitudes',     s:'Falta en tienda · pedir al almacén'},
+    almacen:     {t:'Cámara Almacén',  s:'Stock de reserva'},
+    proveedor:   {t:'Avisos proveedor',s:'Stock bajo · llamar al proveedor'}
+  };
+}
 let current = 0;
+let categoria = null; // 'genero' | 'jamon'
 const track = document.getElementById('track');
 
 /* ---------- Arranque ---------- */
@@ -273,6 +327,7 @@ async function init(){
     await loadData();
     subscribe();
     document.getElementById('loading').style.display='none';
+    document.getElementById('landing').style.display='flex';
     setSync('on');
   }catch(e){
     document.getElementById('loadingText').textContent = 'Error de conexión. Revisa los datos.';
@@ -343,8 +398,9 @@ function changeStock(id, delta){
 
 /* ---------- Render ---------- */
 function render(){
-  const tienda = productos.filter(p=>p.zone==='tienda');
-  const almacen = productos.filter(p=>p.zone==='almacen');
+  const enCategoria = productos.filter(p=>p.categoria===categoria);
+  const tienda = enCategoria.filter(p=>p.zone==='tienda');
+  const almacen = enCategoria.filter(p=>p.zone==='almacen');
   const solicitudes = tienda.filter(p=>p.stock<=p.min);
   const avisos = almacen.filter(p=>p.stock<=p.min);
 
@@ -434,7 +490,7 @@ function goTo(idx){
   document.querySelectorAll('.screen').forEach(function(scr, i){
     scr.classList.toggle('active', i===current);
   });
-  const info = titles[screens[current]];
+  const info = getTitles()[screens[current]];
   document.getElementById('headerTitle').textContent = info.t;
   document.getElementById('headerSub').textContent = info.s;
   document.getElementById('arrowLeft').disabled = current===0;
@@ -445,6 +501,19 @@ function goTo(idx){
 }
 
 /* ---------- Añadir / Editar / Eliminar ---------- */
+function pickCategoria(cat){
+  categoria = cat;
+  document.getElementById('landing').style.display='none';
+  document.getElementById('backBtn').style.display='block';
+  document.getElementById('appUI').style.display='block';
+  goTo(0);
+}
+function backToLanding(){
+  categoria = null;
+  document.getElementById('appUI').style.display='none';
+  document.getElementById('backBtn').style.display='none';
+  document.getElementById('landing').style.display='flex';
+}
 function openAdd(zone){
   editingId=null; addZone=zone;
   document.getElementById('modalTitle').textContent = zone==='tienda'?'Nuevo producto · Tienda':'Nuevo producto · Almacén';
@@ -484,7 +553,7 @@ async function saveProduct(){
   if(editingId){
     await supa.from('productos').update({name,stock,min,proveedor}).eq('id',editingId);
   }else{
-    await supa.from('productos').insert({name,stock,min,zone:addZone,proveedor});
+    await supa.from('productos').insert({name,stock,min,zone:addZone,proveedor,categoria});
   }
   closeModal();
 }
@@ -515,6 +584,8 @@ document.addEventListener('click', function(e){
     case 'delete-product': deleteProduct(); break;
     case 'save-config': saveConfig(); break;
     case 'toggle-prov': el.closest('.prov-card').classList.toggle('open'); break;
+    case 'pick-cat': pickCategoria(el.dataset.cat); break;
+    case 'back-landing': backToLanding(); break;
   }
 });
 
