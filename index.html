@@ -87,6 +87,30 @@
   .alert-desc{font-size:12px; color:var(--muted); margin:5px 0 0;}
   .alert-stock{font-size:12px; color:var(--danger); font-weight:700; margin-top:6px;}
 
+  .prov-card{
+    background:#fff; border-radius:14px; margin-bottom:10px; overflow:hidden;
+    box-shadow:0 1px 3px rgba(0,0,0,.06); border-left:4px solid var(--burgundy);
+  }
+  .prov-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px; cursor:pointer;
+  }
+  .prov-name{font-weight:800; font-size:15px; color:var(--burgundy); margin:0;}
+  .prov-count{
+    background:var(--burgundy); color:#fff; font-size:11px; font-weight:800;
+    border-radius:10px; padding:2px 9px; margin-left:8px;
+  }
+  .prov-chevron{color:var(--muted); font-size:13px; transition:transform .2s;}
+  .prov-card.open .prov-chevron{transform:rotate(90deg);}
+  .prov-items{display:none; padding:0 14px 14px;}
+  .prov-card.open .prov-items{display:block;}
+  .prov-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 0; border-top:1px solid #f0ece3;
+  }
+  .prov-item-name{font-size:13.5px; font-weight:600;}
+  .prov-item-qty{font-size:12px; color:var(--danger); font-weight:700;}
+
   .empty{text-align:center; color:var(--muted); padding:50px 20px; font-size:13.5px; line-height:1.5;}
   .empty .big{font-size:30px; opacity:.35; display:block; margin-bottom:8px;}
 
@@ -180,6 +204,8 @@
     <input id="mStock" type="number" inputmode="numeric" value="10">
     <label>Aviso cuando baje de (mínimo)</label>
     <input id="mMinimo" type="number" inputmode="numeric" value="3">
+    <label id="lblProveedor">Proveedor (para agrupar pedidos)</label>
+    <input id="mProveedor" placeholder="Ej. Pinante">
     <div class="modal-actions">
       <button class="btn btn-ghost" data-action="close-modal">Cancelar</button>
       <button class="btn btn-primary" id="btnSave" data-action="save-product">Guardar</button>
@@ -331,11 +357,37 @@ function render(){
     solicitudes.map(p=>alertHTML(p,'Traer del almacén a la tienda.')).join('')
     || emptyHTML('Sin solicitudes.<br>Todo el género de tienda está por encima del mínimo.');
 
-  document.getElementById('listaProveedor').innerHTML =
-    avisos.map(p=>alertHTML(p,'Contactar con el proveedor para reponer.')).join('')
-    || emptyHTML('Sin avisos.<br>El almacén está por encima del mínimo.');
+  document.getElementById('listaProveedor').innerHTML = proveedorGroupsHTML(avisos);
 
   renderDots(solicitudes.length, avisos.length);
+}
+
+function proveedorGroupsHTML(avisos){
+  if(avisos.length===0){
+    return emptyHTML('Sin avisos.<br>El almacén está por encima del mínimo.');
+  }
+  const grupos = {};
+  avisos.forEach(p=>{
+    const key = (p.proveedor && p.proveedor.trim()) || 'Sin proveedor asignado';
+    if(!grupos[key]) grupos[key] = [];
+    grupos[key].push(p);
+  });
+  return Object.keys(grupos).sort().map(prov=>{
+    const items = grupos[prov];
+    const itemsHTML = items.map(p=>`
+      <div class="prov-item">
+        <span class="prov-item-name">${escapeHtml(p.name)}</span>
+        <span class="prov-item-qty">Quedan ${p.stock} (mínimo ${p.min})</span>
+      </div>`).join('');
+    return `
+    <div class="prov-card" data-prov-card>
+      <div class="prov-header" data-action="toggle-prov">
+        <p class="prov-name">${escapeHtml(prov)}<span class="prov-count">${items.length}</span></p>
+        <span class="prov-chevron">▶</span>
+      </div>
+      <div class="prov-items">${itemsHTML}</div>
+    </div>`;
+  }).join('');
 }
 
 function cardHTML(p){
@@ -344,7 +396,7 @@ function cardHTML(p){
   <div class="product-card ${low?'low':''}">
     <div class="p-info">
       <p class="p-name">${escapeHtml(p.name)}</p>
-      <p class="p-meta">Mínimo: ${p.min} uds</p>
+      <p class="p-meta">Mínimo: ${p.min} uds${p.proveedor?' · '+escapeHtml(p.proveedor):''}</p>
       <p class="p-stock ${low?'low':'ok'}">${low?'⚠ Bajo mínimo':'Disponible'}</p>
       <span class="edit-link" data-action="edit" data-id="${p.id}">editar</span>
     </div>
@@ -399,7 +451,9 @@ function openAdd(zone){
   document.getElementById('mNombre').value='';
   document.getElementById('mStock').value=10;
   document.getElementById('mMinimo').value=3;
+  document.getElementById('mProveedor').value='';
   document.getElementById('deleteRow').style.display='none';
+  toggleProveedorField(zone);
   document.getElementById('modalBg').classList.add('show');
 }
 function openEdit(id){
@@ -409,8 +463,15 @@ function openEdit(id){
   document.getElementById('mNombre').value=p.name;
   document.getElementById('mStock').value=p.stock;
   document.getElementById('mMinimo').value=p.min;
+  document.getElementById('mProveedor').value=p.proveedor||'';
   document.getElementById('deleteRow').style.display='flex';
+  toggleProveedorField(p.zone);
   document.getElementById('modalBg').classList.add('show');
+}
+function toggleProveedorField(zone){
+  const show = zone==='almacen';
+  document.getElementById('lblProveedor').style.display = show?'block':'none';
+  document.getElementById('mProveedor').style.display = show?'block':'none';
 }
 function closeModal(){document.getElementById('modalBg').classList.remove('show');}
 
@@ -418,11 +479,12 @@ async function saveProduct(){
   const name=document.getElementById('mNombre').value.trim();
   const stock=parseInt(document.getElementById('mStock').value)||0;
   const min=parseInt(document.getElementById('mMinimo').value)||0;
+  const proveedor=document.getElementById('mProveedor').value.trim();
   if(!name)return;
   if(editingId){
-    await supa.from('productos').update({name,stock,min}).eq('id',editingId);
+    await supa.from('productos').update({name,stock,min,proveedor}).eq('id',editingId);
   }else{
-    await supa.from('productos').insert({name,stock,min,zone:addZone});
+    await supa.from('productos').insert({name,stock,min,zone:addZone,proveedor});
   }
   closeModal();
 }
@@ -452,6 +514,7 @@ document.addEventListener('click', function(e){
     case 'save-product': saveProduct(); break;
     case 'delete-product': deleteProduct(); break;
     case 'save-config': saveConfig(); break;
+    case 'toggle-prov': el.closest('.prov-card').classList.toggle('open'); break;
   }
 });
 
