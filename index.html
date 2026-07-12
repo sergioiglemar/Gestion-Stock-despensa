@@ -144,8 +144,8 @@
 </header>
 <div class="dots" id="dots"></div>
 
-<button class="nav-arrow left" id="arrowLeft" onclick="goTo(current-1)">‹</button>
-<button class="nav-arrow right" id="arrowRight" onclick="goTo(current+1)">›</button>
+<button class="nav-arrow left" id="arrowLeft" data-action="prev">‹</button>
+<button class="nav-arrow right" id="arrowRight" data-action="next">›</button>
 
 <div class="track" id="track">
   <div class="screen" id="s-tienda">
@@ -166,8 +166,8 @@
   </div>
 </div>
 
-<button class="add-fab" id="fabTienda" onclick="openAdd('tienda')">+</button>
-<button class="add-fab" id="fabAlmacen" onclick="openAdd('almacen')" style="display:none;">+</button>
+<button class="add-fab" id="fabTienda" data-action="add-tienda">+</button>
+<button class="add-fab" id="fabAlmacen" data-action="add-almacen" style="display:none;">+</button>
 
 <footer>Tienda · Solicitudes · Almacén · Proveedor</footer>
 
@@ -182,11 +182,11 @@
     <label>Aviso cuando baje de (mínimo)</label>
     <input id="mMinimo" type="number" inputmode="numeric" value="3">
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" id="btnSave" onclick="saveProduct()">Guardar</button>
+      <button class="btn btn-ghost" data-action="close-modal">Cancelar</button>
+      <button class="btn btn-primary" id="btnSave" data-action="save-product">Guardar</button>
     </div>
     <div class="modal-actions" id="deleteRow" style="display:none;">
-      <button class="btn btn-danger" onclick="deleteProduct()">Eliminar producto</button>
+      <button class="btn btn-danger" data-action="delete-product">Eliminar producto</button>
     </div>
   </div>
 </div>
@@ -201,7 +201,7 @@
     <label>Anon public key</label>
     <input id="cfgKey" placeholder="eyJ...">
     <div class="modal-actions">
-      <button class="btn btn-primary" onclick="saveConfig()">Conectar</button>
+      <button class="btn btn-primary" data-action="save-config">Conectar</button>
     </div>
   </div>
 </div>
@@ -337,11 +337,6 @@ function render(){
     || emptyHTML('Sin avisos.<br>El almacén está por encima del mínimo.');
 
   renderDots(solicitudes.length, avisos.length);
-
-  // Fuerza un repintado en móviles donde a veces el contenido no se pinta tras actualizar
-  track.style.display='none';
-  void track.offsetHeight;
-  track.style.display='flex';
 }
 
 function cardHTML(p){
@@ -352,12 +347,12 @@ function cardHTML(p){
       <p class="p-name">${escapeHtml(p.name)}</p>
       <p class="p-meta">Mínimo: ${p.min} uds</p>
       <p class="p-stock ${low?'low':'ok'}">${low?'⚠ Bajo mínimo':'Disponible'}</p>
-      <span class="edit-link" onclick="openEdit('${p.id}')">editar</span>
+      <span class="edit-link" data-action="edit" data-id="${p.id}">editar</span>
     </div>
     <div class="qty-controls">
-      <button class="qty-btn minus" onclick="changeStock('${p.id}',-1)">−</button>
+      <button class="qty-btn minus" data-action="minus" data-id="${p.id}">−</button>
       <span class="qty-val">${p.stock}</span>
-      <button class="qty-btn plus" onclick="changeStock('${p.id}',1)">+</button>
+      <button class="qty-btn plus" data-action="plus" data-id="${p.id}">+</button>
     </div>
   </div>`;
 }
@@ -380,7 +375,7 @@ function renderDots(nSol, nAvi){
     let n=0;
     if(sc==='solicitudes') n=nSol;
     if(sc==='proveedor') n=nAvi;
-    return `<div class="dot ${i===current?'active':''}" onclick="goTo(${i})">${n>0?`<span class="n">${n}</span>`:''}</div>`;
+    return `<div class="dot ${i===current?'active':''}" data-action="goto" data-idx="${i}">${n>0?`<span class="n">${n}</span>`:''}</div>`;
   }).join('');
 }
 function goTo(idx){
@@ -436,6 +431,28 @@ async function deleteProduct(){
   await supa.from('productos').delete().eq('id',editingId);
   closeModal();
 }
+
+/* ---------- Delegación de eventos (evita usar onclick inline) ---------- */
+document.addEventListener('click', function(e){
+  const el = e.target.closest('[data-action]');
+  if(!el) return;
+  const action = el.dataset.action;
+  const id = el.dataset.id;
+  switch(action){
+    case 'prev': goTo(current-1); break;
+    case 'next': goTo(current+1); break;
+    case 'goto': goTo(parseInt(el.dataset.idx)); break;
+    case 'add-tienda': openAdd('tienda'); break;
+    case 'add-almacen': openAdd('almacen'); break;
+    case 'edit': openEdit(id); break;
+    case 'minus': changeStock(id,-1); break;
+    case 'plus': changeStock(id,1); break;
+    case 'close-modal': closeModal(); break;
+    case 'save-product': saveProduct(); break;
+    case 'delete-product': deleteProduct(); break;
+    case 'save-config': saveConfig(); break;
+  }
+});
 
 init();
 </script>
