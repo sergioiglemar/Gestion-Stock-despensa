@@ -393,6 +393,12 @@ function changeStock(id, delta){
   debounceTimers[id] = setTimeout(async ()=>{
     const {error} = await supa.from('productos').update({stock:p.stock}).eq('id', id);
     if(error){ setSync('off'); console.error(error); }
+    // Registro del movimiento para poder sacar estadísticas más adelante.
+    // No bloquea la interfaz ni afecta si falla.
+    supa.from('movimientos').insert({
+      producto_id: p.id, nombre: p.name, zone: p.zone, categoria: p.categoria,
+      delta: delta, stock_resultante: p.stock
+    }).then(({error})=>{ if(error) console.error('movimiento no guardado', error); });
   }, 350);
 }
 
