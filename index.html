@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -168,7 +169,7 @@
 <button class="add-fab" id="fabTienda" onclick="openAdd('tienda')">+</button>
 <button class="add-fab" id="fabAlmacen" onclick="openAdd('almacen')" style="display:none;">+</button>
 
-<footer>Tienda · Solicitudes · Almacén · Proveedor — desliza →</footer>
+<footer>Tienda · Solicitudes · Almacén · Proveedor</footer>
 
 <!-- Modal añadir/editar -->
 <div class="modal-bg" id="modalBg">
@@ -336,6 +337,11 @@ function render(){
     || emptyHTML('Sin avisos.<br>El almacén está por encima del mínimo.');
 
   renderDots(solicitudes.length, avisos.length);
+
+  // Fuerza un repintado en móviles donde a veces el contenido no se pinta tras actualizar
+  track.style.display='none';
+  void track.offsetHeight;
+  track.style.display='flex';
 }
 
 function cardHTML(p){
@@ -389,22 +395,6 @@ function goTo(idx){
   document.getElementById('fabAlmacen').style.display = screens[current]==='almacen' ? 'flex' : 'none';
   render();
 }
-let startX=0,startY=0,dragging=false,deltaX=0;
-track.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;startY=e.touches[0].clientY;dragging=true;deltaX=0;track.style.transition='none';},{passive:true});
-track.addEventListener('touchmove',e=>{
-  if(!dragging)return;
-  deltaX=e.touches[0].clientX-startX;
-  const dy=e.touches[0].clientY-startY;
-  if(Math.abs(dy)>Math.abs(deltaX))return;
-  track.style.transform=`translateX(calc(-${current*100}% + ${deltaX}px))`;
-},{passive:true});
-track.addEventListener('touchend',()=>{
-  dragging=false;
-  track.style.transition='transform .35s cubic-bezier(.22,.9,.3,1)';
-  if(deltaX<-55)goTo(current+1);
-  else if(deltaX>55)goTo(current-1);
-  else goTo(current);
-});
 
 /* ---------- Añadir / Editar / Eliminar ---------- */
 function openAdd(zone){
