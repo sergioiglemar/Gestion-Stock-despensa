@@ -96,6 +96,17 @@
     box-shadow:0 3px 10px rgba(0,0,0,.25); z-index:10;
   }
   .add-fab:active{transform:scale(.92);}
+  .nav-arrow{
+    position:fixed; top:50%; transform:translateY(-50%); z-index:20;
+    width:38px; height:38px; border-radius:50%; border:none;
+    background:rgba(122,27,44,.85); color:#fff; font-size:18px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+  }
+  .nav-arrow:disabled{opacity:.25; cursor:default;}
+  .nav-arrow.left{left:10px;}
+  .nav-arrow.right{right:10px;}
+  .dot{cursor:pointer;}
   footer{
     background:#fff; border-top:1px solid #e8e2d5; padding:7px 0 9px; text-align:center;
     font-size:10.5px; color:var(--muted); flex-shrink:0;
@@ -131,6 +142,9 @@
   <div class="sub" id="headerSub">Producto listo para vender</div>
 </header>
 <div class="dots" id="dots"></div>
+
+<button class="nav-arrow left" id="arrowLeft" onclick="goTo(current-1)">‹</button>
+<button class="nav-arrow right" id="arrowRight" onclick="goTo(current+1)">›</button>
 
 <div class="track" id="track">
   <div class="screen" id="s-tienda">
@@ -359,7 +373,7 @@ function renderDots(nSol, nAvi){
     let n=0;
     if(sc==='solicitudes') n=nSol;
     if(sc==='proveedor') n=nAvi;
-    return `<div class="dot ${i===current?'active':''}">${n>0?`<span class="n">${n}</span>`:''}</div>`;
+    return `<div class="dot ${i===current?'active':''}" onclick="goTo(${i})">${n>0?`<span class="n">${n}</span>`:''}</div>`;
   }).join('');
 }
 function goTo(idx){
@@ -368,6 +382,8 @@ function goTo(idx){
   const info = titles[screens[current]];
   document.getElementById('headerTitle').textContent = info.t;
   document.getElementById('headerSub').textContent = info.s;
+  document.getElementById('arrowLeft').disabled = current===0;
+  document.getElementById('arrowRight').disabled = current===screens.length-1;
   render();
 }
 let startX=0,startY=0,dragging=false,deltaX=0;
