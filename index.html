@@ -48,14 +48,13 @@
     border-radius:8px; padding:0 4px; min-width:13px; line-height:13px; text-align:center;
   }
   .track{
-    display:flex; flex:1; overflow:hidden; position:relative;
-    transition: transform .35s cubic-bezier(.22,.9,.3,1);
-    touch-action: pan-y;
+    display:block; flex:1; overflow:hidden; position:relative;
   }
   .screen{
-    min-width:100%; height:100%; overflow-y:auto; padding:12px 12px 90px;
-    -webkit-overflow-scrolling:touch;
+    display:none; width:100%; height:100%; overflow-y:auto; padding:12px 12px 90px;
+    -webkit-overflow-scrolling:touch; box-sizing:border-box;
   }
+  .screen.active{display:block;}
   .screen-title{font-size:12px; font-weight:800; color:var(--burgundy); text-transform:uppercase; letter-spacing:.6px; margin:2px 4px 10px;}
   .product-card{
     background:var(--card); border-radius:14px; padding:11px 12px; margin-bottom:9px;
@@ -148,7 +147,7 @@
 <button class="nav-arrow right" id="arrowRight" data-action="next">›</button>
 
 <div class="track" id="track">
-  <div class="screen" id="s-tienda">
+  <div class="screen active" id="s-tienda">
     <div class="screen-title">Stock en tienda</div>
     <div id="listaTienda"></div>
   </div>
@@ -380,7 +379,9 @@ function renderDots(nSol, nAvi){
 }
 function goTo(idx){
   current = Math.max(0, Math.min(screens.length-1, idx));
-  track.style.transform = `translateX(-${current*100}%)`;
+  document.querySelectorAll('.screen').forEach(function(scr, i){
+    scr.classList.toggle('active', i===current);
+  });
   const info = titles[screens[current]];
   document.getElementById('headerTitle').textContent = info.t;
   document.getElementById('headerSub').textContent = info.s;
