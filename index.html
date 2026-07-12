@@ -150,7 +150,6 @@
   <div class="screen" id="s-tienda">
     <div class="screen-title">Stock en tienda</div>
     <div id="listaTienda"></div>
-    <button class="add-fab" onclick="openAdd('tienda')">+</button>
   </div>
   <div class="screen" id="s-solicitudes">
     <div class="screen-title">Solicitudes a almacén</div>
@@ -159,13 +158,15 @@
   <div class="screen" id="s-almacen">
     <div class="screen-title">Stock en almacén</div>
     <div id="listaAlmacen"></div>
-    <button class="add-fab" onclick="openAdd('almacen')">+</button>
   </div>
   <div class="screen" id="s-proveedor">
     <div class="screen-title">Avisos a proveedor</div>
     <div id="listaProveedor"></div>
   </div>
 </div>
+
+<button class="add-fab" id="fabTienda" onclick="openAdd('tienda')">+</button>
+<button class="add-fab" id="fabAlmacen" onclick="openAdd('almacen')" style="display:none;">+</button>
 
 <footer>Tienda · Solicitudes · Almacén · Proveedor — desliza →</footer>
 
@@ -384,6 +385,8 @@ function goTo(idx){
   document.getElementById('headerSub').textContent = info.s;
   document.getElementById('arrowLeft').disabled = current===0;
   document.getElementById('arrowRight').disabled = current===screens.length-1;
+  document.getElementById('fabTienda').style.display = screens[current]==='tienda' ? 'flex' : 'none';
+  document.getElementById('fabAlmacen').style.display = screens[current]==='almacen' ? 'flex' : 'none';
   render();
 }
 let startX=0,startY=0,dragging=false,deltaX=0;
