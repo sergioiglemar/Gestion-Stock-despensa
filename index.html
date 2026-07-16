@@ -187,6 +187,36 @@
   .landing-btn.genero{background:var(--burgundy); color:var(--cream);}
   .landing-btn.jamon{background:var(--gold); color:var(--burgundy);}
   .landing-btn.deshuese{background:#3a5a40; color:#fff;}
+  .landing-btn.facturas{background:#2b3a67; color:#fff;}
+
+  .tabs{display:flex; gap:8px; padding:0 4px 12px;}
+  .tab{flex:1; text-align:center; padding:9px; border-radius:10px; font-size:12.5px; font-weight:700; background:#F0E9DE; color:var(--burgundy); cursor:pointer;}
+  .tab.active{background:var(--burgundy); color:#fff;}
+
+  .fact-card{background:#fff; border-radius:14px; padding:13px 14px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); border-left:4px solid var(--gold);}
+  .fact-card.comprobado{border-left-color:var(--ok);}
+  .fact-top{display:flex; justify-content:space-between; align-items:flex-start;}
+  .fact-prov{font-weight:800; font-size:15px; margin:0;}
+  .fact-meta{font-size:12px; color:var(--muted); margin:2px 0 0;}
+  .fact-lineas{margin-top:8px; font-size:12.5px;}
+  .fact-linea{display:flex; justify-content:space-between; padding:4px 0; border-top:1px solid #f0ece3;}
+  .fact-actions{display:flex; gap:8px; margin-top:10px;}
+
+  .linea-row{background:#F7F3EB; border-radius:10px; padding:10px; margin-bottom:8px;}
+  .linea-row label{font-size:11px; color:var(--muted); display:block; margin:6px 0 3px;}
+  .linea-row select, .linea-row input{width:100%; padding:8px; border-radius:8px; border:1px solid #ddd; font-size:13px;}
+  .file-drop{
+    border:2px dashed #ccc; border-radius:12px; padding:20px; text-align:center; color:var(--muted);
+    font-size:13px; margin:12px 0; cursor:pointer;
+  }
+
+  .chat-box{background:#fff; border-radius:14px; padding:14px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .chat-box h4{margin:0 0 8px; font-size:13px; color:var(--burgundy); text-transform:uppercase; letter-spacing:.4px;}
+  .chat-input-row{display:flex; gap:8px;}
+  .chat-input-row input{flex:1; padding:10px; border-radius:9px; border:1px solid #ddd; font-size:13.5px;}
+  .chat-input-row button{padding:0 16px; border-radius:9px; border:none; background:var(--burgundy); color:#fff; font-weight:700;}
+  .chat-respuesta{margin-top:10px; font-size:13.5px; line-height:1.5; white-space:pre-wrap; color:var(--text);}
+  .chat-respuesta.loading{color:var(--muted); font-style:italic;}
   .landing-btn .sub{display:block; font-size:11.5px; font-weight:500; text-transform:none; opacity:.85; margin-top:6px; letter-spacing:normal;}
   .back-btn{
     position:fixed; top:14px; left:14px; z-index:25; background:rgba(0,0,0,.25); color:#fff;
@@ -214,6 +244,10 @@
   <button class="landing-btn deshuese" data-action="show-deshuese">
     Deshuese
     <span class="sub">Cola de jamones de clientes a deshuesar y lonchear</span>
+  </button>
+  <button class="landing-btn facturas" data-action="show-facturas">
+    Facturas
+    <span class="sub">Subir e comprobar facturas de proveedor</span>
   </button>
 </div>
 
@@ -300,7 +334,54 @@
   <footer>Toca "Marcar listo" cuando termines de deshuesar y lonchear</footer>
 </div>
 
-<!-- Modal alta deshuese -->
+<div id="facturasUI" style="display:none;">
+  <header>
+    <div class="sync-dot" id="syncDotF" title="Estado de sincronización"></div>
+    <h1>Facturas de proveedor</h1>
+    <div class="sub">Pendientes de comprobar y ya comprobadas</div>
+  </header>
+  <div class="track" id="trackF">
+    <div class="screen active" id="s-facturas" style="padding-bottom:90px;">
+      <div class="chat-box">
+        <h4>Pregunta sobre tus compras</h4>
+        <div class="chat-input-row">
+          <input id="chatPregunta" placeholder="Ej. ¿A cuánto compré jamones a Pinante en enero?">
+          <button data-action="preguntar-precio">Preguntar</button>
+        </div>
+        <div id="chatRespuesta" class="chat-respuesta"></div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" data-action="tab-facturas" data-tab="pendiente">Pendientes</div>
+        <div class="tab" data-action="tab-facturas" data-tab="comprobado">Comprobadas</div>
+      </div>
+      <div id="listaFacturas"></div>
+    </div>
+  </div>
+  <button class="add-fab" data-action="add-factura">+</button>
+  <footer>Sube la foto de la factura y revisa lo que detecte antes de guardar</footer>
+</div>
+
+<!-- Modal alta factura -->
+<div class="modal-bg" id="facturaModalBg">
+  <div class="modal">
+    <h3>Nueva factura</h3>
+    <label>Tipo</label>
+    <select id="fTipo">
+      <option value="tienda">Llega a Tienda</option>
+      <option value="almacen">Pedido a Almacén</option>
+    </select>
+    <label>Proveedor</label>
+    <input id="fProveedor" list="listaProveedores" placeholder="Elige o escribe uno nuevo">
+    <div class="file-drop" id="fileDrop" data-action="open-file-picker">📷 Toca para subir foto/PDF de la factura</div>
+    <input type="file" id="fFile" accept="image/*,.pdf" style="display:none;">
+    <div id="fEstadoLectura" style="font-size:12.5px; color:var(--muted); margin:6px 0;"></div>
+    <div id="fLineasContainer"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-factura-modal">Cancelar</button>
+      <button class="btn btn-primary" data-action="save-factura">Guardar como pendiente</button>
+    </div>
+  </div>
+</div>
 <div class="modal-bg" id="deshueseModalBg">
   <div class="modal">
     <h3>Nuevo jamón para deshuesar</h3>
@@ -353,6 +434,9 @@ let SB_KEY = HARDCODED_KEY || localStorage.getItem('sb_key') || "";
 let supa = null;
 let productos = [];            // [{id, name, zone, stock, min}]
 let deshuese = [];             // [{id, cliente, marca, telefono, instrucciones, express, estado, fecha_entrada}]
+let facturas = [];             // [{id, tipo, proveedor, estado, imagen_base64, lineas}]
+let tabFacturaActiva = 'pendiente';
+let lineasDetectadas = [];      // líneas de la factura que se está creando ahora mismo
 let editingId = null;
 let addZone = 'tienda';
 const debounceTimers = {};
@@ -426,6 +510,10 @@ async function loadData(){
   if(dError) throw dError;
   deshuese = dData;
 
+  const {data: fData, error: fError} = await supa.from('facturas').select('*').order('created_at',{ascending:false});
+  if(fError) throw fError;
+  facturas = fData;
+
   render();
 }
 
@@ -443,6 +531,24 @@ function subscribe(){
       applyChangeDeshuese(payload);
     })
     .subscribe();
+
+  supa.channel('facturas-cambios')
+    .on('postgres_changes', {event:'*', schema:'public', table:'facturas'}, payload=>{
+      applyChangeFactura(payload);
+    })
+    .subscribe();
+}
+
+function applyChangeFactura(payload){
+  if(payload.eventType==='INSERT'){
+    if(!facturas.find(f=>f.id===payload.new.id)) facturas.unshift(payload.new);
+  }else if(payload.eventType==='UPDATE'){
+    const i = facturas.findIndex(f=>f.id===payload.new.id);
+    if(i>=0) facturas[i] = payload.new;
+  }else if(payload.eventType==='DELETE'){
+    facturas = facturas.filter(f=>f.id!==payload.old.id);
+  }
+  renderFacturas();
 }
 
 function applyChangeDeshuese(payload){
@@ -479,7 +585,7 @@ function applyChange(payload){
 function changeStock(id, delta){
   const p = productos.find(x=>x.id===id);
   if(!p) return;
-  p.stock = Math.max(0, p.stock + delta);
+  p.stock = Math.round(Math.max(0, p.stock + delta) * 100) / 100;
   render();
   clearTimeout(debounceTimers[id]);
   debounceTimers[id] = setTimeout(async ()=>{
@@ -546,18 +652,21 @@ function proveedorGroupsHTML(avisos){
 
 function cardHTML(p){
   const low = p.stock <= p.min;
+  const unidad = p.unidad==='kg' ? 'kg' : 'uds';
+  const stockMostrado = p.unidad==='kg' ? Number(p.stock).toFixed(1) : p.stock;
+  const paso = p.unidad==='kg' ? 0.5 : 1;
   return `
   <div class="product-card ${low?'low':''}">
     <div class="p-info">
       <p class="p-name">${escapeHtml(p.name)}</p>
-      <p class="p-meta">Mínimo: ${p.min} uds${p.proveedor?' · '+escapeHtml(p.proveedor):''}</p>
+      <p class="p-meta">Mínimo: ${p.min} ${unidad}${p.proveedor?' · '+escapeHtml(p.proveedor):''}</p>
       <p class="p-stock ${low?'low':'ok'}">${low?'⚠ Bajo mínimo':'Disponible'}</p>
       <span class="edit-link" data-action="edit" data-id="${p.id}">editar</span>
     </div>
     <div class="qty-controls">
-      <button class="qty-btn minus" data-action="minus" data-id="${p.id}">−</button>
-      <span class="qty-val">${p.stock}</span>
-      <button class="qty-btn plus" data-action="plus" data-id="${p.id}">+</button>
+      <button class="qty-btn minus" data-action="minus" data-id="${p.id}" data-step="${paso}">−</button>
+      <span class="qty-val">${stockMostrado}</span>
+      <button class="qty-btn plus" data-action="plus" data-id="${p.id}" data-step="${paso}">+</button>
     </div>
   </div>`;
 }
@@ -636,6 +745,165 @@ function renderDeshuese(){
   }).join('');
 }
 
+async function preguntarPrecio(){
+  const pregunta = document.getElementById('chatPregunta').value.trim();
+  if(!pregunta) return;
+  const el = document.getElementById('chatRespuesta');
+  el.className = 'chat-respuesta loading';
+  el.textContent = 'Consultando el histórico de facturas…';
+  try{
+    const {data, error} = await supa.functions.invoke('preguntar-precios', { body: { pregunta } });
+    if(error) throw error;
+    el.className = 'chat-respuesta';
+    el.textContent = data.respuesta || 'No se pudo obtener respuesta.';
+  }catch(e){
+    console.error(e);
+    el.className = 'chat-respuesta';
+    el.textContent = 'No se pudo consultar ahora mismo. Inténtalo de nuevo en un momento.';
+  }
+}
+
+function showFacturas(){
+  document.getElementById('landing').style.display='none';
+  document.getElementById('backBtn').style.display='block';
+  document.getElementById('facturasUI').style.display='block';
+  renderFacturas();
+}
+
+function cambiarTabFactura(tab){
+  tabFacturaActiva = tab;
+  document.querySelectorAll('#facturasUI .tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  renderFacturas();
+}
+
+function renderFacturas(){
+  const el = document.getElementById('listaFacturas');
+  const lista = facturas.filter(f=>f.estado===tabFacturaActiva);
+  if(lista.length===0){
+    el.innerHTML = emptyHTML(tabFacturaActiva==='pendiente' ? 'No hay facturas pendientes de comprobar.' : 'Aún no hay facturas comprobadas.');
+    return;
+  }
+  el.innerHTML = lista.map(f=>{
+    const fecha = new Date(f.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const lineasHTML = (f.lineas||[]).map(l=>`
+      <div class="fact-linea"><span>${escapeHtml(l.nombre||'')}</span><span>${l.kilos} kg</span></div>`).join('');
+    return `
+    <div class="fact-card ${f.estado}">
+      <div class="fact-top">
+        <div>
+          <p class="fact-prov">${escapeHtml(f.proveedor||'Sin proveedor')}</p>
+          <p class="fact-meta">${f.tipo==='tienda'?'Llega a Tienda':'Pedido a Almacén'} · ${fecha}</p>
+        </div>
+      </div>
+      <div class="fact-lineas">${lineasHTML}</div>
+      <div class="fact-actions">
+        ${f.estado==='pendiente'
+          ? `<button class="desh-btn avanzar" data-action="comprobar-factura" data-id="${f.id}">Marcar comprobada (sube stock)</button>`
+          : ''}
+        <button class="desh-btn eliminar" data-action="eliminar-factura" data-id="${f.id}">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openFacturaAdd(){
+  document.getElementById('fTipo').value='tienda';
+  document.getElementById('fProveedor').value='';
+  document.getElementById('fFile').value='';
+  document.getElementById('fEstadoLectura').textContent='';
+  document.getElementById('fLineasContainer').innerHTML='';
+  lineasDetectadas = [];
+  document.getElementById('facturaModalBg').classList.add('show');
+}
+function closeFacturaModal(){
+  document.getElementById('facturaModalBg').classList.remove('show');
+}
+
+function abrirSelectorArchivo(){
+  document.getElementById('fFile').click();
+}
+
+async function handleFacturaFile(){
+  const file = document.getElementById('fFile').files[0];
+  if(!file) return;
+  const estadoEl = document.getElementById('fEstadoLectura');
+  estadoEl.textContent = 'Leyendo la factura con IA, espera un momento…';
+
+  const base64 = await new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+  try{
+    const {data, error} = await supa.functions.invoke('leer-factura', {
+      body: { imagen_base64: base64 }
+    });
+    if(error) throw error;
+    lineasDetectadas = (data.lineas||[]).map(l=>({
+      nombre: l.nombre||'', kilos: l.kilos||0, precio: l.precio||null, producto_id: null
+    }));
+    estadoEl.textContent = lineasDetectadas.length
+      ? `Detectadas ${lineasDetectadas.length} líneas. Revisa y ajusta antes de guardar.`
+      : 'No se detectaron líneas. Añádelas a mano si hace falta.';
+    renderLineasFactura();
+  }catch(e){
+    console.error(e);
+    estadoEl.textContent = 'No se pudo leer automáticamente. Puedes seguir sin líneas o pedir ayuda para configurar la lectura por IA.';
+  }
+}
+
+function renderLineasFactura(){
+  const tipo = document.getElementById('fTipo').value;
+  const opciones = productos.filter(p=>p.zone===tipo && p.categoria==='genero');
+  const cont = document.getElementById('fLineasContainer');
+  cont.innerHTML = lineasDetectadas.map((l,i)=>`
+    <div class="linea-row">
+      <label>Producto detectado</label>
+      <input value="${escapeHtml(l.nombre)}" onchange="lineasDetectadas[${i}].nombre=this.value">
+      <label>Vincular con producto existente (para actualizar su stock)</label>
+      <select onchange="lineasDetectadas[${i}].producto_id=this.value||null">
+        <option value="">— No vincular (solo guardar el dato) —</option>
+        ${opciones.map(p=>`<option value="${p.id}" ${l.producto_id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}
+      </select>
+      <label>Kilos</label>
+      <input type="number" step="0.1" value="${l.kilos}" onchange="lineasDetectadas[${i}].kilos=parseFloat(this.value)||0">
+    </div>
+  `).join('');
+}
+
+async function saveFactura(){
+  const tipo = document.getElementById('fTipo').value;
+  const proveedor = document.getElementById('fProveedor').value.trim();
+  await supa.from('facturas').insert({
+    tipo, proveedor, lineas: lineasDetectadas, estado: 'pendiente'
+  });
+  closeFacturaModal();
+}
+
+async function comprobarFactura(facturaId){
+  const f = facturas.find(x=>x.id===facturaId);
+  if(!f) return;
+  if(!confirm('Al comprobarla, se sumará el peso a los productos vinculados. ¿Confirmas que ya has pesado y revisado el género?')) return;
+
+  for(const l of (f.lineas||[])){
+    if(l.producto_id){
+      const p = productos.find(x=>x.id===l.producto_id);
+      if(p){
+        const nuevoStock = Math.round(((p.stock||0) + (l.kilos||0)) * 100) / 100;
+        await supa.from('productos').update({stock: nuevoStock}).eq('id', l.producto_id);
+      }
+    }
+  }
+  await supa.from('facturas').update({estado:'comprobado', comprobado_at: new Date().toISOString()}).eq('id', facturaId);
+}
+
+async function eliminarFactura(id){
+  if(!confirm('¿Eliminar esta factura?')) return;
+  await supa.from('facturas').delete().eq('id', id);
+}
+
 function showDeshuese(){
   document.getElementById('landing').style.display='none';
   document.getElementById('backBtn').style.display='block';
@@ -683,6 +951,7 @@ function backToLanding(){
   categoria = null;
   document.getElementById('appUI').style.display='none';
   document.getElementById('deshueseUI').style.display='none';
+  document.getElementById('facturasUI').style.display='none';
   document.getElementById('backBtn').style.display='none';
   document.getElementById('landing').style.display='flex';
 }
@@ -718,14 +987,15 @@ function closeModal(){document.getElementById('modalBg').classList.remove('show'
 
 async function saveProduct(){
   const name=document.getElementById('mNombre').value.trim();
-  const stock=parseInt(document.getElementById('mStock').value)||0;
-  const min=parseInt(document.getElementById('mMinimo').value)||0;
+  const stock=parseFloat(document.getElementById('mStock').value)||0;
+  const min=parseFloat(document.getElementById('mMinimo').value)||0;
   const proveedor=document.getElementById('mProveedor').value.trim();
+  const unidad = categoria==='genero' ? 'kg' : 'uds';
   if(!name)return;
   if(editingId){
     await supa.from('productos').update({name,stock,min,proveedor}).eq('id',editingId);
   }else{
-    await supa.from('productos').insert({name,stock,min,zone:addZone,proveedor,categoria});
+    await supa.from('productos').insert({name,stock,min,zone:addZone,proveedor,categoria,unidad});
   }
   closeModal();
 }
@@ -742,6 +1012,7 @@ document.addEventListener('click', function(e){
   if(!el) return;
   const action = el.dataset.action;
   const id = el.dataset.id;
+  const step = el.dataset.step ? parseFloat(el.dataset.step) : 1;
   switch(action){
     case 'prev': goTo(current-1); break;
     case 'next': goTo(current+1); break;
@@ -749,8 +1020,8 @@ document.addEventListener('click', function(e){
     case 'add-tienda': openAdd('tienda'); break;
     case 'add-almacen': openAdd('almacen'); break;
     case 'edit': openEdit(id); break;
-    case 'minus': changeStock(id,-1); break;
-    case 'plus': changeStock(id,1); break;
+    case 'minus': changeStock(id,-step); break;
+    case 'plus': changeStock(id,step); break;
     case 'close-modal': closeModal(); break;
     case 'save-product': saveProduct(); break;
     case 'delete-product': deleteProduct(); break;
@@ -765,8 +1036,20 @@ document.addEventListener('click', function(e){
     case 'desh-listo': marcarDeshuese(id,'listo'); break;
     case 'desh-entregado': marcarDeshuese(id,'entregado'); break;
     case 'desh-eliminar': eliminarDeshuese(id); break;
+    case 'show-facturas': showFacturas(); break;
+    case 'add-factura': openFacturaAdd(); break;
+    case 'close-factura-modal': closeFacturaModal(); break;
+    case 'save-factura': saveFactura(); break;
+    case 'comprobar-factura': comprobarFactura(id); break;
+    case 'eliminar-factura': eliminarFactura(id); break;
+    case 'tab-facturas': cambiarTabFactura(el.dataset.tab); break;
+    case 'open-file-picker': abrirSelectorArchivo(); break;
+    case 'preguntar-precio': preguntarPrecio(); break;
   }
 });
+
+document.getElementById('fFile').addEventListener('change', handleFacturaFile);
+document.getElementById('fTipo').addEventListener('change', renderLineasFactura);
 
 init();
 </script>
