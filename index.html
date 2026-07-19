@@ -299,6 +299,12 @@
     <input id="mStock" type="number" inputmode="numeric" value="10">
     <label>Aviso cuando baje de (mínimo)</label>
     <input id="mMinimo" type="number" inputmode="numeric" value="3">
+    <label id="lblGrupo">Grupo</label>
+    <select id="mGrupo"></select>
+    <label id="lblSubgrupo">Tipo</label>
+    <select id="mSubgrupo"></select>
+    <label id="lblKgCaja">Kilos aprox. por caja (para convertir kilos de factura a cajas)</label>
+    <input id="mKgPorCaja" type="number" step="0.1" inputmode="decimal" placeholder="Ej. 12">
     <label id="lblProveedor">Proveedor (para agrupar pedidos)</label>
     <input id="mProveedor" list="listaProveedores" placeholder="Elige o escribe uno nuevo">
     <datalist id="listaProveedores">
@@ -609,9 +615,9 @@ function render(){
   const avisos = almacen.filter(p=>p.stock<=p.min);
 
   document.getElementById('listaTienda').innerHTML =
-    tienda.map(cardHTML).join('') || emptyHTML('Sin productos en tienda.<br>Pulsa el botón dorado + para añadir.');
+    grupoProductosHTML(tienda) || emptyHTML('Sin productos en tienda.<br>Pulsa el botón dorado + para añadir.');
   document.getElementById('listaAlmacen').innerHTML =
-    almacen.map(cardHTML).join('') || emptyHTML('Sin productos en almacén.<br>Pulsa el botón dorado + para añadir.');
+    grupoProductosHTML(almacen) || emptyHTML('Sin productos en almacén.<br>Pulsa el botón dorado + para añadir.');
 
   document.getElementById('listaSolicitudes').innerHTML =
     solicitudes.map(p=>alertHTML(p,'Traer del almacén a la tienda.')).join('')
@@ -620,6 +626,28 @@ function render(){
   document.getElementById('listaProveedor').innerHTML = proveedorGroupsHTML(avisos);
 
   renderDots(solicitudes.length, avisos.length);
+}
+
+function grupoProductosHTML(lista){
+  if(lista.length===0) return '';
+  const grupos = {};
+  lista.forEach(p=>{
+    const key = [p.grupo||'Sin grupo', p.subgrupo||''].filter(Boolean).join(' · ') || 'Sin grupo';
+    if(!grupos[key]) grupos[key] = [];
+    grupos[key].push(p);
+  });
+  return Object.keys(grupos).sort().map(key=>{
+    const items = grupos[key];
+    const bajos = items.filter(p=>p.stock<=p.min).length;
+    return `
+    <div class="prov-card" data-prov-card>
+      <div class="prov-header" data-action="toggle-prov">
+        <p class="prov-name">${escapeHtml(key)}<span class="prov-count">${items.length}${bajos?' · '+bajos+' bajo mín.':''}</span></p>
+        <span class="prov-chevron">▶</span>
+      </div>
+      <div class="prov-items" style="padding:0 10px 10px;">${items.map(cardHTML).join('')}</div>
+    </div>`;
+  }).join('');
 }
 
 function proveedorGroupsHTML(avisos){
@@ -887,19 +915,27 @@ function renderLineasFactura(){
   const tipo = document.getElementById('fTipo').value;
   const opciones = productos.filter(p=>p.zone===tipo && p.categoria==='genero');
   const cont = document.getElementById('fLineasContainer');
-  cont.innerHTML = lineasDetectadas.map((l,i)=>`
+  cont.innerHTML = lineasDetectadas.map((l,i)=>{
+    const productoVinculado = opciones.find(p=>p.id===l.producto_id);
+    let previsto = '';
+    if(productoVinculado && productoVinculado.kg_por_caja>0){
+      const cajas = Math.round((l.kilos||0) / productoVinculado.kg_por_caja);
+      previsto = `<div style="font-size:11.5px; color:var(--ok); margin-top:4px;">≈ ${cajas} cajas (a ${productoVinculado.kg_por_caja} kg/caja)</div>`;
+    }
+    return `
     <div class="linea-row">
       <label>Producto detectado</label>
       <input value="${escapeHtml(l.nombre)}" onchange="lineasDetectadas[${i}].nombre=this.value">
       <label>Vincular con producto existente (para actualizar su stock)</label>
-      <select onchange="lineasDetectadas[${i}].producto_id=this.value||null">
+      <select onchange="lineasDetectadas[${i}].producto_id=this.value||null; renderLineasFactura();">
         <option value="">— No vincular (solo guardar el dato) —</option>
         ${opciones.map(p=>`<option value="${p.id}" ${l.producto_id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}
       </select>
-      <label>Kilos</label>
-      <input type="number" step="0.1" value="${l.kilos}" onchange="lineasDetectadas[${i}].kilos=parseFloat(this.value)||0">
-    </div>
-  `).join('');
+      <label>Kilos (según factura)</label>
+      <input type="number" step="0.1" value="${l.kilos}" onchange="lineasDetectadas[${i}].kilos=parseFloat(this.value)||0; renderLineasFactura();">
+      ${previsto}
+    </div>`;
+  }).join('');
 }
 
 async function saveFactura(){
@@ -914,13 +950,18 @@ async function saveFactura(){
 async function comprobarFactura(facturaId){
   const f = facturas.find(x=>x.id===facturaId);
   if(!f) return;
-  if(!confirm('Al comprobarla, se sumará el peso a los productos vinculados. ¿Confirmas que ya has pesado y revisado el género?')) return;
+  if(!confirm('Al comprobarla, se sumará el stock a los productos vinculados. ¿Confirmas que ya has pesado y revisado el género?')) return;
 
   for(const l of (f.lineas||[])){
     if(l.producto_id){
       const p = productos.find(x=>x.id===l.producto_id);
       if(p){
-        const nuevoStock = Math.round(((p.stock||0) + (l.kilos||0)) * 100) / 100;
+        let aSumar = l.kilos||0;
+        // Si el producto tiene kilos/caja definidos, convertimos los kilos de la factura a nº de cajas
+        if(p.kg_por_caja && p.kg_por_caja>0){
+          aSumar = Math.round((l.kilos||0) / p.kg_por_caja);
+        }
+        const nuevoStock = Math.round(((p.stock||0) + aSumar) * 100) / 100;
         await supa.from('productos').update({stock: nuevoStock}).eq('id', l.producto_id);
       }
     }
@@ -984,6 +1025,29 @@ function backToLanding(){
   document.getElementById('backBtn').style.display='none';
   document.getElementById('landing').style.display='flex';
 }
+const GRUPOS = {
+  genero: ['Embutido','Deshuesado'],
+  jamon:  ['Jamones','Paletas']
+};
+const SUBGRUPOS = {
+  'Embutido':   ['Lomos','Chorizos','Salchichones'],
+  'Deshuesado': ['Jamones','Paletas'],
+  'Jamones':    ['Serrano','Cebo','Cebo de Campo','Bellota'],
+  'Paletas':    ['Serrano','Cebo','Cebo de Campo','Bellota']
+};
+
+function poblarGrupos(grupoSeleccionado, subgrupoSeleccionado){
+  const opcionesGrupo = GRUPOS[categoria] || [];
+  const selGrupo = document.getElementById('mGrupo');
+  selGrupo.innerHTML = opcionesGrupo.map(g=>`<option value="${g}" ${g===grupoSeleccionado?'selected':''}>${g}</option>`).join('');
+  poblarSubgrupos(selGrupo.value, subgrupoSeleccionado);
+}
+function poblarSubgrupos(grupo, subgrupoSeleccionado){
+  const opciones = SUBGRUPOS[grupo] || [];
+  const selSub = document.getElementById('mSubgrupo');
+  selSub.innerHTML = opciones.map(s=>`<option value="${s}" ${s===subgrupoSeleccionado?'selected':''}>${s}</option>`).join('');
+}
+
 function openAdd(zone){
   editingId=null; addZone=zone;
   document.getElementById('modalTitle').textContent = zone==='tienda'?'Nuevo producto · Tienda':'Nuevo producto · Almacén';
@@ -991,8 +1055,11 @@ function openAdd(zone){
   document.getElementById('mStock').value=10;
   document.getElementById('mMinimo').value=3;
   document.getElementById('mProveedor').value='';
+  document.getElementById('mKgPorCaja').value='';
   document.getElementById('deleteRow').style.display='none';
   toggleProveedorField(zone);
+  poblarGrupos(null,null);
+  toggleKgCajaField();
   document.getElementById('modalBg').classList.add('show');
 }
 function openEdit(id){
@@ -1003,14 +1070,23 @@ function openEdit(id){
   document.getElementById('mStock').value=p.stock;
   document.getElementById('mMinimo').value=p.min;
   document.getElementById('mProveedor').value=p.proveedor||'';
+  document.getElementById('mKgPorCaja').value=p.kg_por_caja||'';
   document.getElementById('deleteRow').style.display='flex';
   toggleProveedorField(p.zone);
+  poblarGrupos(p.grupo, p.subgrupo);
+  toggleKgCajaField();
   document.getElementById('modalBg').classList.add('show');
 }
 function toggleProveedorField(zone){
   const show = zone==='almacen';
   document.getElementById('lblProveedor').style.display = show?'block':'none';
   document.getElementById('mProveedor').style.display = show?'block':'none';
+}
+function toggleKgCajaField(){
+  // Solo tiene sentido definir kilos/caja en productos de género (los que llegan por peso y se cuentan en cajas)
+  const show = categoria==='genero';
+  document.getElementById('lblKgCaja').style.display = show?'block':'none';
+  document.getElementById('mKgPorCaja').style.display = show?'block':'none';
 }
 function closeModal(){document.getElementById('modalBg').classList.remove('show');}
 
@@ -1019,12 +1095,15 @@ async function saveProduct(){
   const stock=parseFloat(document.getElementById('mStock').value)||0;
   const min=parseFloat(document.getElementById('mMinimo').value)||0;
   const proveedor=document.getElementById('mProveedor').value.trim();
-  const unidad = categoria==='genero' ? 'kg' : 'uds';
+  const grupo=document.getElementById('mGrupo').value;
+  const subgrupo=document.getElementById('mSubgrupo').value;
+  const kgPorCajaVal = document.getElementById('mKgPorCaja').value;
+  const kg_por_caja = kgPorCajaVal ? parseFloat(kgPorCajaVal) : null;
   if(!name)return;
   if(editingId){
-    await supa.from('productos').update({name,stock,min,proveedor}).eq('id',editingId);
+    await supa.from('productos').update({name,stock,min,proveedor,grupo,subgrupo,kg_por_caja}).eq('id',editingId);
   }else{
-    await supa.from('productos').insert({name,stock,min,zone:addZone,proveedor,categoria,unidad});
+    await supa.from('productos').insert({name,stock,min,zone:addZone,proveedor,categoria,unidad:'uds',grupo,subgrupo,kg_por_caja});
   }
   closeModal();
 }
@@ -1086,6 +1165,7 @@ window.addEventListener('orientationchange', setAppHeight);
 
 document.getElementById('fFile').addEventListener('change', handleFacturaFile);
 document.getElementById('fTipo').addEventListener('change', renderLineasFactura);
+document.getElementById('mGrupo').addEventListener('change', function(){ poblarSubgrupos(this.value, null); });
 
 init();
 </script>
